@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "directus-sync": "^3.0.0",
+    "typescript": "^5.5.4"
+  }
+}

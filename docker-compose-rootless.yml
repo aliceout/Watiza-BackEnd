@@ -1,0 +1,113 @@
+
+# TODO Askip les données genre password sont pas sécurisées si on les passe pas variable d'environnement
+# il faudrait plutot passer par les secrets de docker
+# ca s'integre plutot facilement avec directus d'apres https://docs.directus.io/self-hosted/config-options.html#environment-variable-files
+
+# Note : All variable looking likes ${VAR} should be defines in a .env file at same level directory as this file.
+#        Warning ! the .env file should not be track in VCS
+services:
+  # Init the database container for docker rootless support
+  # database-init:
+  #   image: postgres:${POSTGRES_VERSION}
+  #   volumes:
+  #     - ./data/database:/var/lib/postgresql/data
+  #   entrypoint:
+  #     - sh 
+  #     - -c 
+  #     - | 
+  #       echo "database init - connected as : $(whoami) ($(id -u $(whoami)))"
+      # chown -R ${POSTGRES_UID}:${POSTGRES_GID} /var/lib/postgresql/data
+        
+
+  # Start the database and load data
+  database:
+    # depends_on:
+    #   database-init:
+    #     condition: service_completed_successfully
+ 
+    image: postgres:${POSTGRES_VERSION} 
+    #user: ${POSTGRES_UID}:${POSTGRES_GID}
+      # Temporaly comment to recreate database at each start and allow to test initialization process
+    volumes:
+      - ./data/database:/var/lib/postgresql/data
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_DB=${POSTGRES_DB}
+    healthcheck:
+      test: ["CMD", "pg_isready", "--host=localhost", "--username=directus"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_interval: 5s
+      start_period: 30s
+    ports:
+      - 5432:5432
+
+
+  # Redis cache for directus
+  cache:
+    image: redis:6
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "[ $$(redis-cli ping) = 'PONG' ]"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_interval: 5s
+      start_period: 30s
+
+  # Set up headless CMS directus
+  directus:
+    # Use our own Dockerfile to customize Directus installation
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    #command: node install -g @directus/sdk
+    #         node install -g directus-extension-api-docs
+    
+    ports:
+      - 8055:8055
+
+    volumes:
+      - ./uploads:/directus/uploads
+      - ./extensions:/directus/extensions
+    depends_on:
+      cache:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+    restart: always
+
+    environment:
+      KEY: ${DIRECTUS_KEY}
+      SECRET: ${DIRECTUS_SECRET}
+
+      DB_CLIENT: 'pg'
+      DB_HOST: ${POSTGRES_HOST}
+      DB_PORT: '5432'
+      DB_DATABASE: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+
+      #CACHE_ENABLED: 'true'
+      CACHE_ENABLED: 'false'
+      CACHE_STORE: 'redis'
+      REDIS: ${DIRECTUS_REDIS_CACHE}
+
+      ADMIN_EMAIL: ${DIRECTUS_ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${DIRECTUS_ADMIN_PASSWORD}
+
+      PUBLIC_URL: ${DIRECTUS_PUBLIC_URL}
+
+      # Allow frontend to access database
+      CORS_ENABLED: true
+      # Maybe this parameter is too permissive and it should be restrict to web_app server
+      CORS_ORIGIN: true
+
+      EXTENSIONS_AUTO_RELOAD: true
+  
+
+
