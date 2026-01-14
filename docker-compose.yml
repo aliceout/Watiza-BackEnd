@@ -51,5 +51,5 @@ services:
       ADMIN_EMAIL: 'directus.earthling695@slmail.me'
       ADMIN_PASSWORD: 'Saloon-Stand-Unmindful8'
 
-      PUBLIC_URL: 'https://watizat.lunalink.nl'
+      PUBLIC_URL: 'https://back.watizat.app'
 
